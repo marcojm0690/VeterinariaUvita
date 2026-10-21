@@ -1,0 +1,78 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "API: run",
+      "type": "shell",
+      "command": "dotnet watch run --project src/VeterinariaUvita.Api",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "servers" }
+    },
+    {
+      "label": "UI: run",
+      "type": "shell",
+      "command": "npm start",
+      "options": { "cwd": "${workspaceFolder}/client" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "servers" }
+    },
+    {
+      "label": "Start all (API + UI)",
+      "dependsOn": ["API: run", "UI: run"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "API: build",
+      "type": "shell",
+      "command": "dotnet build",
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "UI: install",
+      "type": "shell",
+      "command": "npm install",
+      "options": { "cwd": "${workspaceFolder}/client" },
+      "problemMatcher": []
+    },
+    {
+      "label": "UI: build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": { "cwd": "${workspaceFolder}/client" },
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "UI: test",
+      "type": "shell",
+      "command": "npm test -- --watch=false",
+      "options": { "cwd": "${workspaceFolder}/client" },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "DB: add migration",
+      "type": "shell",
+      "command": "dotnet ef migrations add ${input:migrationName} --project src/VeterinariaUvita.Api -o Data/Migrations",
+      "problemMatcher": []
+    },
+    {
+      "label": "DB: update database",
+      "type": "shell",
+      "command": "dotnet ef database update --project src/VeterinariaUvita.Api",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "migrationName",
+      "type": "promptString",
+      "description": "Migration name (e.g. AddVaccines)"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VeterinariaUvita.Api/VeterinariaUvita.Api.csproj" />
+  </Folder>
+</Solution>

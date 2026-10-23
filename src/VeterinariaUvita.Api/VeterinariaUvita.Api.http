@@ -1,6 +1,171 @@
-@VeterinariaUvita.Api_HostAddress = http://localhost:5231
+@host = http://localhost:5231
 
-GET {{VeterinariaUvita.Api_HostAddress}}/weatherforecast/
+# =============================================================================
+# PBI-01 — Módulo Propietario — Pruebas de la API REST
+# Ejecutar con: dotnet run --project src/VeterinariaUvita.Api
+# Documentación interactiva: http://localhost:5231/scalar/v1
+# =============================================================================
+
+
+# ─── 1. CREAR propietario válido ─────────────────────────────────────────────
+# Resultado esperado: 201 Created + JSON con el propietario creado (id, cedula, etc.)
+POST {{host}}/api/owners
+Content-Type: application/json
+
+{
+  "firstName": "Ana",
+  "lastName": "Mora",
+  "cedula": "1-2345-6789",
+  "email": "ana.mora@example.com",
+  "phone": "+506 8888-0000",
+  "address": "Uvita, Puntarenas"
+}
+
+###
+
+# ─── 2. CREAR segundo propietario válido ─────────────────────────────────────
+# Resultado esperado: 201 Created
+POST {{host}}/api/owners
+Content-Type: application/json
+
+{
+  "firstName": "Carlos",
+  "lastName": "Rojas",
+  "cedula": "2-3456-7890",
+  "email": "carlos.rojas@example.com",
+  "phone": "+506 7777-1111",
+  "address": "San José, Costa Rica"
+}
+
+###
+
+# ─── 3. OBTENER todos los propietarios ───────────────────────────────────────
+# Resultado esperado: 200 OK + arreglo JSON con todos los propietarios ordenados por apellido
+GET {{host}}/api/owners
 Accept: application/json
+
+###
+
+# ─── 4. OBTENER propietario por ID válido ────────────────────────────────────
+# Resultado esperado: 200 OK + JSON del propietario con id=1
+GET {{host}}/api/owners/1
+Accept: application/json
+
+###
+
+# ─── 5. OBTENER propietario por ID inexistente ───────────────────────────────
+# Resultado esperado: 404 Not Found
+GET {{host}}/api/owners/9999
+Accept: application/json
+
+###
+
+# ─── 6. OBTENER mascotas de un propietario ───────────────────────────────────
+# Resultado esperado: 200 OK + arreglo de mascotas del propietario con id=1
+GET {{host}}/api/owners/1/pets
+Accept: application/json
+
+###
+
+# ─── 7. ACTUALIZAR propietario existente ─────────────────────────────────────
+# Resultado esperado: 204 No Content
+PUT {{host}}/api/owners/1
+Content-Type: application/json
+
+{
+  "firstName": "Ana María",
+  "lastName": "Mora Jiménez",
+  "cedula": "1-2345-6789",
+  "email": "ana.mora.nueva@example.com",
+  "phone": "+506 8888-9999",
+  "address": "Dominical, Puntarenas"
+}
+
+###
+
+# ─── 8. ACTUALIZAR propietario inexistente ───────────────────────────────────
+# Resultado esperado: 404 Not Found
+PUT {{host}}/api/owners/9999
+Content-Type: application/json
+
+{
+  "firstName": "Nadie",
+  "lastName": "No Existe",
+  "cedula": "0-0000-0000",
+  "email": "noexiste@example.com",
+  "phone": "+506 0000-0000"
+}
+
+###
+
+# ─── 9. ELIMINAR propietario existente ───────────────────────────────────────
+# Resultado esperado: 204 No Content
+DELETE {{host}}/api/owners/2
+
+###
+
+# ─── 10. ELIMINAR propietario inexistente ────────────────────────────────────
+# Resultado esperado: 404 Not Found
+DELETE {{host}}/api/owners/9999
+
+###
+
+# ─── 11. ERROR — Campos obligatorios vacíos ──────────────────────────────────
+# Resultado esperado: 400 Bad Request con detalle de validación
+POST {{host}}/api/owners
+Content-Type: application/json
+
+{
+  "firstName": "",
+  "lastName": "",
+  "cedula": "",
+  "email": "no-es-correo",
+  "phone": ""
+}
+
+###
+
+# ─── 12. ERROR — Correo electrónico duplicado ────────────────────────────────
+# Resultado esperado: 409 Conflict con mensaje descriptivo
+POST {{host}}/api/owners
+Content-Type: application/json
+
+{
+  "firstName": "Otra",
+  "lastName": "Persona",
+  "cedula": "3-9999-8888",
+  "email": "ana.mora.nueva@example.com",
+  "phone": "+506 6666-5555"
+}
+
+###
+
+# ─── 13. ERROR — Cédula duplicada ────────────────────────────────────────────
+# Resultado esperado: 409 Conflict con mensaje descriptivo
+POST {{host}}/api/owners
+Content-Type: application/json
+
+{
+  "firstName": "Otra",
+  "lastName": "Persona",
+  "cedula": "1-2345-6789",
+  "email": "otrapersona@example.com",
+  "phone": "+506 5555-4444"
+}
+
+###
+
+# ─── 14. ERROR — Email con formato inválido ──────────────────────────────────
+# Resultado esperado: 400 Bad Request
+POST {{host}}/api/owners
+Content-Type: application/json
+
+{
+  "firstName": "Test",
+  "lastName": "Formato",
+  "cedula": "4-1111-2222",
+  "email": "esto-no-es-un-correo",
+  "phone": "+506 1111-2222"
+}
 
 ###

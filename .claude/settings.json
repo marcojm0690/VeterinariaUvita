@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(az repos *)",
+      "Bash(az devops *)",
+      "Bash(git ls-tree *)"
+    ]
+  }
+}

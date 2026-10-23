@@ -3,7 +3,8 @@
     "allow": [
       "Bash(az repos *)",
       "Bash(az devops *)",
-      "Bash(git ls-tree *)"
+      "Bash(git ls-tree *)",
+      "Bash(gh api *)"
     ]
   }
 }

@@ -1,14 +1,22 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
 
+import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+
+
 import { Pet } from '../../core/models';
 import { PetService } from '../../core/services/pet.service';
 
 @Component({
   selector: 'app-pet-list',
-  imports: [MatTableModule],
+  imports: [MatTableModule, MatButtonModule, RouterLink],
   template: `
     <h1>Mascotas</h1>
+
+    <a mat-flat-button routerLink="/pets/consulta">
+  Consultar información
+</a>
 
     <table mat-table [dataSource]="pets()">
       <ng-container matColumnDef="name">

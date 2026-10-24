@@ -10,6 +10,13 @@ export const routes: Routes = [
       { path: ':id', loadComponent: () => import('./features/owners/owner-form').then((m) => m.OwnerForm) },
     ],
   },
+  
+{
+  path: 'pets/consulta',
+  loadComponent: () =>
+    import('./features/pets/pet-detail').then((m) => m.PetDetail),
+},
+
   { path: 'pets', loadComponent: () => import('./features/pets/pet-list').then((m) => m.PetList) },
   {
     path: 'veterinarians',

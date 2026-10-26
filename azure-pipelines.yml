@@ -1,0 +1,66 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  buildConfiguration: Release
+
+stages:
+  - stage: Api
+    displayName: API (.NET)
+    jobs:
+      - job: BuildApi
+        displayName: Build and publish API
+        steps:
+          - task: UseDotNet@2
+            displayName: Install .NET SDK from global.json
+            inputs:
+              packageType: sdk
+              useGlobalJson: true
+
+          - script: dotnet build --configuration $(buildConfiguration)
+            displayName: Build
+
+          - script: dotnet publish src/VeterinariaUvita.Api --configuration $(buildConfiguration) --no-build --output $(Build.ArtifactStagingDirectory)/api
+            displayName: Publish
+
+          - publish: $(Build.ArtifactStagingDirectory)/api
+            artifact: api
+            displayName: Upload API artifact
+
+  - stage: Client
+    displayName: UI (Angular)
+    dependsOn: []
+    jobs:
+      - job: BuildClient
+        displayName: Test and build Angular app
+        steps:
+          - task: NodeTool@0
+            displayName: Install Node.js
+            inputs:
+              versionSpec: 22.x
+
+          - script: npm ci
+            displayName: Install dependencies
+            workingDirectory: client
+
+          - script: npm test -- --watch=false
+            displayName: Test
+            workingDirectory: client
+
+          - script: npm run build
+            displayName: Build
+            workingDirectory: client
+
+          - publish: client/dist/client
+            artifact: client
+            displayName: Upload UI artifact

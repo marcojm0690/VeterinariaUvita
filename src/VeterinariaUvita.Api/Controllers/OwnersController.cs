@@ -32,6 +32,7 @@ public class OwnersController(AppDbContext db) : ControllerBase
         return await db.Pets.AsNoTracking()
             .Include(p => p.Owner)
             .Where(p => p.OwnerId == id)
+            .OrderBy(p => p.Name)
             .Select(p => PetsController.ToResponse(p))
             .ToListAsync(ct);
     }
@@ -76,6 +77,9 @@ public class OwnersController(AppDbContext db) : ControllerBase
     {
         var owner = await db.Owners.FindAsync([id], ct);
         if (owner is null) return NotFound();
+
+        if (await db.Pets.AnyAsync(p => p.OwnerId == id, ct))
+            return Conflict("No se puede eliminar un propietario que tiene mascotas asociadas.");
 
         db.Owners.Remove(owner);
         await db.SaveChangesAsync(ct);

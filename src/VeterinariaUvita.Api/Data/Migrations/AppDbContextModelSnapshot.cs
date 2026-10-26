@@ -261,7 +261,7 @@ namespace VeterinariaUvita.Api.Data.Migrations
                     b.HasOne("VeterinariaUvita.Api.Models.Owner", "Owner")
                         .WithMany("Pets")
                         .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Owner");

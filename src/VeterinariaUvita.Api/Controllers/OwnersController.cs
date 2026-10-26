@@ -32,19 +32,34 @@ public class OwnersController(AppDbContext db) : ControllerBase
         return await db.Pets.AsNoTracking()
             .Include(p => p.Owner)
             .Where(p => p.OwnerId == id)
+            .OrderBy(p => p.Name)
             .Select(p => PetsController.ToResponse(p))
             .ToListAsync(ct);
     }
 
+
     [HttpPost]
     public async Task<ActionResult<OwnerResponse>> Create(OwnerRequest request, CancellationToken ct)
     {
+        var emailExists = await db.Owners
+            .AnyAsync(o => o.Email.ToLower() == request.Email.ToLower(), ct);
+
+        if (emailExists)
+        {
+            return Conflict(new
+            {
+                message = "Este correo ya está registrado. Usa otro correo."
+            });
+        }
+
         var owner = new Owner();
         Apply(owner, request);
         db.Owners.Add(owner);
         await db.SaveChangesAsync(ct);
+
         return CreatedAtAction(nameof(GetById), new { id = owner.Id }, ToResponse(owner));
     }
+
 
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, OwnerRequest request, CancellationToken ct)
@@ -62,6 +77,9 @@ public class OwnersController(AppDbContext db) : ControllerBase
     {
         var owner = await db.Owners.FindAsync([id], ct);
         if (owner is null) return NotFound();
+
+        if (await db.Pets.AnyAsync(p => p.OwnerId == id, ct))
+            return Conflict("No se puede eliminar un propietario que tiene mascotas asociadas.");
 
         db.Owners.Remove(owner);
         await db.SaveChangesAsync(ct);

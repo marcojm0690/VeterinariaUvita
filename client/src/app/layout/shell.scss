@@ -1,21 +1,96 @@
 :host {
+  /* Paleta Uvita: cambia estos valores para ajustar todo el look */
+  --vet-sand-light: #f8f4ea; /* arena clara (fondo) */
+  --vet-sand: #ecdfc4; /* arena de playa */
+  --vet-line: #d9cdb2; /* líneas */
+  --vet-sea: #0e7490; /* turquesa principal */
+  --vet-sea-deep: #0b5d77; /* mar profundo */
+  --vet-sea-ink: #0b4f63; /* título de la barra superior */
+  --vet-sea-pale: #c5e0e8; /* turquesa pálido (círculo de la huella) */
+  --vet-navy: #12384a; /* títulos */
+  --vet-ink: #1d3b47; /* texto */
+  --vet-muted: #44606b; /* texto secundario */
+
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* Tokens de Angular Material (tema M3): la paleta llega a toda la app */
+  --mat-sys-primary: var(--vet-sea);
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-on-surface: var(--vet-ink);
+  --mat-sys-on-surface-variant: var(--vet-muted);
+  --mat-sys-secondary-container: #d3ebef; /* fondo del ítem activo del menú */
+  --mat-sys-on-secondary-container: var(--vet-navy);
+  --mat-sys-outline: #7fa3aa;
+  --mat-sys-outline-variant: var(--vet-line);
+  --mat-sys-error: #b4442d;
+  --mat-sys-corner-extra-small: 4px;
+  --mat-sys-corner-full: 6px;
 }
+
+/* ---------- Encabezado ---------- */
+/* Debe medir 64px: el formulario de dueños usa ese valor para ajustarse a la pantalla */
+.toolbar {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  height: 64px;
+  min-height: 64px;
+  padding: 0 24px;
+  gap: 16px;
+  color: var(--vet-sea-ink);
+  background: var(--vet-sand-light);
+}
+
+.brand-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--vet-sea-pale);
+}
+
+  .brand-badge img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
 
 .app-title {
-  margin-left: 8px;
+  font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--vet-sea-ink);
 }
 
+/* ---------- Cuerpo ---------- */
 .container {
   flex: 1;
+  min-height: 0;
+  background: var(--vet-sand-light);
 }
 
+/* Menú lateral: arena clara con una ola de mar al fondo */
 .sidenav {
   width: 220px;
+  border-radius: 0;
+  border-right: 1px solid var(--vet-line);
+  background-color: var(--vet-sand-light);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 80' preserveAspectRatio='none'%3E%3Cpath d='M0 30 C 40 6, 90 6, 130 30 S 200 50, 220 28 L220 80 L0 80 Z' fill='%230e7490' fill-opacity='.16'/%3E%3Cpath d='M0 50 C 45 30, 95 30, 135 50 S 200 66, 220 46 L220 80 L0 80 Z' fill='%23ecdfc4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: bottom;
+  background-size: 100% 80px;
 }
 
+/* Se mantiene el padding de 24px: el resto de las páginas lo necesitan
+   y el formulario de dueños lo cancela con un margen negativo */
 .content {
   padding: 24px;
+  background: var(--vet-sand-light);
 }

@@ -36,15 +36,29 @@ public class OwnersController(AppDbContext db) : ControllerBase
             .ToListAsync(ct);
     }
 
+
     [HttpPost]
     public async Task<ActionResult<OwnerResponse>> Create(OwnerRequest request, CancellationToken ct)
     {
+        var emailExists = await db.Owners
+            .AnyAsync(o => o.Email.ToLower() == request.Email.ToLower(), ct);
+
+        if (emailExists)
+        {
+            return Conflict(new
+            {
+                message = "Este correo ya está registrado. Usa otro correo."
+            });
+        }
+
         var owner = new Owner();
         Apply(owner, request);
         db.Owners.Add(owner);
         await db.SaveChangesAsync(ct);
+
         return CreatedAtAction(nameof(GetById), new { id = owner.Id }, ToResponse(owner));
     }
+
 
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, OwnerRequest request, CancellationToken ct)

@@ -4,7 +4,9 @@
       "Bash(az repos *)",
       "Bash(az devops *)",
       "Bash(git ls-tree *)",
-      "Bash(gh api *)"
+      "Bash(gh api *)",
+      "Bash(git fetch *)",
+      "Bash(/opt/homebrew/bin/gh api *)"
     ]
   }
 }

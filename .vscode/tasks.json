@@ -3,8 +3,14 @@
   "tasks": [
     {
       "label": "API: run",
-      "type": "shell",
-      "command": "dotnet watch run --project src/VeterinariaUvita.Api",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/src/VeterinariaUvita.Api/VeterinariaUvita.Api.csproj"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
       "isBackground": true,
       "problemMatcher": [],
       "presentation": { "panel": "dedicated", "group": "servers" }
@@ -27,8 +33,10 @@
     },
     {
       "label": "API: build",
-      "type": "shell",
-      "command": "dotnet build",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/VeterinariaUvita.slnx"],
+      "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": "$msCompile",
       "group": "build"
     },

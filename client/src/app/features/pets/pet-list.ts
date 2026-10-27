@@ -3,10 +3,6 @@ import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 
-import { RouterLink } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
-
-
 import { Pet } from '../../core/models';
 import { PetService } from '../../core/services/pet.service';
 

@@ -27,7 +27,7 @@ import { OwnerService } from '../../core/services/owner.service';
           <th mat-header-cell *matHeaderCellDef>Nombre</th>
           <td mat-cell *matCellDef="let o">
             <span class="owner-name">
-              <span class="avatar" aria-hidden="true"><mat-icon>pets</mat-icon></span>
+              <span class="avatar" aria-hidden="true"><mat-icon>people</mat-icon></span>
               {{ o.firstName }} {{ o.lastName }}
             </span>
           </td>

@@ -65,3 +65,7 @@ nunit-*.xml
 node_modules/
 .angular/
 dist/
+
+# Visual Studio
+.vs/
+**/.vs/

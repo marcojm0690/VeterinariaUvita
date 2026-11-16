@@ -1,10 +1,13 @@
-import { Component, inject, input, OnInit } from '@angular/core';
+import { Component, inject, input, OnInit, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { Router, RouterLink } from '@angular/router';
 
+import { Owner } from '../../core/models';
+import { OwnerService } from '../../core/services/owner.service';
 import { PetService } from '../../core/services/pet.service';
 
 // Este componente sirve para registrar y editar mascotas.
@@ -16,6 +19,7 @@ import { PetService } from '../../core/services/pet.service';
     ReactiveFormsModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatButtonModule,
     RouterLink
   ],
@@ -90,11 +94,19 @@ import { PetService } from '../../core/services/pet.service';
               <mat-error>El peso debe ser mayor que cero</mat-error>
             </mat-form-field>
 
-            <!-- Campo para indicar a qué propietario pertenece -->
+            <!-- Lista desplegable con los propietarios registrados -->
             <mat-form-field appearance="outline">
-              <mat-label>ID del propietario</mat-label>
-              <input matInput type="number" min="1" formControlName="ownerId" />
-              <mat-error>Ingrese un propietario válido</mat-error>
+              <mat-label>Propietario</mat-label>
+              <mat-select formControlName="ownerId" panelClass="vet-select-panel">
+                @for (dueno of duenos(); track dueno.id) {
+                  <mat-option [value]="dueno.id">{{ dueno.firstName }} {{ dueno.lastName }}</mat-option>
+                }
+              </mat-select>
+              <mat-error>Seleccione un propietario</mat-error>
+
+              @if (duenosCargados() && duenos().length === 0) {
+                <mat-hint>No hay propietarios registrados todavía</mat-hint>
+              }
             </mat-form-field>
           </div>
         </div>
@@ -139,6 +151,16 @@ import { PetService } from '../../core/services/pet.service';
       --mat-sys-error: #b4442d;
       --mat-sys-corner-extra-small: 4px;
       --mat-sys-corner-full: 6px;
+    }
+
+    ::ng-deep .vet-select-panel {
+      --mat-sys-primary: #0e7490;
+      --mat-sys-on-surface: #1d3b47;
+      --mat-sys-on-surface-variant: #44606b;
+      --mat-sys-surface-container: #fcfaf4;
+      --mat-sys-secondary-container: #d3ebef;
+      --mat-sys-on-secondary-container: #12384a;
+      --mat-sys-corner-extra-small: 4px;
     }
 
     .card {
@@ -324,10 +346,17 @@ export class PetForm implements OnInit {
   // Usamos estas herramientas para crear el formulario, guardar las mascotas y cambiar de pantalla.
   private fb = inject(NonNullableFormBuilder);
   private servicio = inject(PetService);
+  private servicioDuenos = inject(OwnerService);
   private router = inject(Router);
 
   // Este dato nos ayuda a saber si estamos editando una mascota.
   readonly id = input<string>();
+
+  // Aquí guardamos la lista de propietarios que se muestra en el campo desplegable.
+  protected readonly duenos = signal<Owner[]>([]);
+
+  // Nos avisa cuando ya terminó de cargar la lista de propietarios.
+  protected readonly duenosCargados = signal(false);
 
   // Aquí creamos los campos del formulario.
   // Validators.required significa que el campo es obligatorio.
@@ -342,11 +371,23 @@ export class PetForm implements OnInit {
     weightKg: [null as number | null, Validators.min(0.01)],
 
     // La mascota debe estar relacionada con un propietario.
+    // Aunque la persona elige un nombre, aquí se guarda el ID de ese propietario.
     ownerId: [0, [Validators.required, Validators.min(1)]]
   });
 
   // Este método se ejecuta cuando se abre la pantalla.
   ngOnInit(): void {
+
+    // Pedimos la lista de propietarios registrados y la ordenamos por nombre.
+    this.servicioDuenos.getAll().subscribe(lista => {
+
+      const ordenada = [...lista].sort((a, b) =>
+        `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'es')
+      );
+
+      this.duenos.set(ordenada);
+      this.duenosCargados.set(true);
+    });
 
     // Revisamos si viene un ID de mascota.
     const idMascota = this.id();

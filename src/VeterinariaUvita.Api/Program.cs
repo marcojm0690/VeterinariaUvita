@@ -22,7 +22,15 @@ builder.Services.AddCors(options =>
         .AllowAnyMethod()));
 
 var app = builder.Build();
+Console.WriteLine("Directorio actual: " + Directory.GetCurrentDirectory());
+Console.WriteLine("Directorio aplicación: " + AppContext.BaseDirectory);
 
+Console.WriteLine("Base de datos: " +
+    app.Services.CreateScope()
+        .ServiceProvider
+        .GetRequiredService<AppDbContext>()
+        .Database.GetDbConnection()
+        .DataSource);
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())

@@ -10,24 +10,16 @@ export const routes: Routes = [
       { path: ':id', loadComponent: () => import('./features/owners/owner-form').then((m) => m.OwnerForm) },
     ],
   },
-  
-{
-  path: 'pets/consulta',
-  loadComponent: () =>
-    import('./features/pets/pet-detail').then((m) => m.PetDetail),
-},
 
-  { path: 'pets', loadComponent: () => import('./features/pets/pet-list').then((m) => m.PetList) },
+  {
+    path: 'pets/consulta',
+    loadComponent: () => import('./features/pets/pet-detail').then((m) => m.PetDetail),
+  },
   {
     path: 'pets',
     children: [
-      // Muestra la lista de mascotas.
       { path: '', loadComponent: () => import('./features/pets/pet-list').then((m) => m.PetList) },
-
-      // Abre el formulario para registrar una mascota nueva.
       { path: 'new', loadComponent: () => import('./features/pets/pet-form').then((m) => m.PetForm) },
-
-      // Abre el formulario para editar una mascota existente.
       { path: ':id', loadComponent: () => import('./features/pets/pet-form').then((m) => m.PetForm) },
     ],
   },

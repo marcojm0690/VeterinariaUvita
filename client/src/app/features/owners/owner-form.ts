@@ -457,8 +457,23 @@ export class OwnerForm implements OnInit {
 
   ngOnInit(): void {
     const id = this.id();
+
+    console.log('ID recibido en OwnerForm:', id);
+
     if (id) {
-      this.service.getById(Number(id)).subscribe((owner) => this.form.patchValue({ ...owner, address: owner.address ?? '' }));
+      this.service.getById(Number(id)).subscribe({
+        next: (owner) => {
+          console.log('Propietario encontrado:', owner);
+
+          this.form.patchValue({
+            ...owner,
+            address: owner.address ?? ''
+          });
+        },
+        error: (error) => {
+          console.error('Error al buscar propietario:', error);
+        }
+      });
     }
   }
 

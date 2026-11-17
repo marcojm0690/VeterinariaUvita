@@ -2,9 +2,11 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 
-import { Pet } from '../../core/models';
+import { Owner, Pet } from '../../core/models';
+import { OwnerService } from '../../core/services/owner.service';
 import { PetService } from '../../core/services/pet.service';
 
 function normalize(value: string): string {
@@ -18,7 +20,7 @@ function normalize(value: string): string {
 
 @Component({
   selector: 'app-pet-list',
-  imports: [MatTableModule, MatButtonModule, MatIconModule, RouterLink],
+  imports: [MatTableModule, MatButtonModule, MatIconModule, MatTooltipModule, RouterLink],
   template: `
     <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
       <symbol id="vet-paw" viewBox="0 0 64 64">
@@ -84,30 +86,41 @@ function normalize(value: string): string {
         </ng-container>
         <ng-container matColumnDef="owner">
           <th mat-header-cell *matHeaderCellDef>Dueño</th>
-          <td mat-cell *matCellDef="let p">{{ p.ownerName }}</td>
+          <td mat-cell *matCellDef="let p">
+            <!-- Al pasar el cursor se muestra el correo y el teléfono del dueño -->
+            <span
+              class="owner-hover"
+              [matTooltip]="ownerInfo(p)"
+              matTooltipPosition="above"
+              matTooltipClass="owner-tip"
+              [matTooltipShowDelay]="150"
+              >{{ p.ownerName }}</span
+            >
+          </td>
         </ng-container>
-<ng-container matColumnDef="actions">
-  <th mat-header-cell *matHeaderCellDef></th>
-  <td mat-cell *matCellDef="let p">
-<button
-  mat-icon-button
-  class="edit"
-  [routerLink]="['/pets', p.id]"
-  aria-label="Editar mascota"
->
-  <mat-icon>edit</mat-icon>
-</button>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let p">
+            <button
+              mat-icon-button
+              class="edit"
+              [routerLink]="['/pets', p.id]"
+              aria-label="Editar mascota"
+            >
+              <mat-icon>edit</mat-icon>
+            </button>
 
-    <button
-      mat-icon-button
-      class="delete"
-      (click)="remove(p)"
-      aria-label="Eliminar mascota"
-    >
-      <mat-icon>delete</mat-icon>
-    </button>
-  </td>
-</ng-container>
+            <button
+              mat-icon-button
+              class="delete"
+              (click)="remove(p)"
+              aria-label="Eliminar mascota"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
         <tr mat-header-row *matHeaderRowDef="columns"></tr>
         <tr mat-row *matRowDef="let row; columns: columns"></tr>
       </table>
@@ -145,6 +158,22 @@ function normalize(value: string): string {
       --mat-sys-corner-full: 6px;
     }
 
+    /* Tarjeta con correo y teléfono del dueño (tooltip) */
+    ::ng-deep .owner-tip .mdc-tooltip__surface {
+      white-space: pre-line;
+      max-width: 320px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #ffffff;
+      background: #12384a;
+    }
+
+    .owner-hover {
+      cursor: default;
+      border-bottom: 1px dotted var(--vet-line);
+    }
+
     .header {
       display: flex;
       align-items: center;
@@ -179,6 +208,7 @@ function normalize(value: string): string {
       color: #a83222;
       background: #f4dfd8;
     }
+
     .subtitle {
       margin: 4px 0 0;
       font-size: 0.9rem;
@@ -382,11 +412,15 @@ function normalize(value: string): string {
 })
 export class PetList implements OnInit {
   private readonly service = inject(PetService);
+  private readonly ownerService = inject(OwnerService);
 
   protected readonly pets = signal<Pet[]>([]);
   protected readonly loaded = signal(false);
   protected readonly search = signal('');
   protected readonly columns = ['name', 'species', 'breed', 'owner', 'actions'];
+
+  // Dueños por ID, para mostrar su correo y teléfono en la tarjeta.
+  protected readonly ownersById = signal(new Map<number, Owner>());
 
   protected readonly filtered = computed(() => {
     const terms = normalize(this.search()).split(' ').filter(Boolean);
@@ -399,10 +433,11 @@ export class PetList implements OnInit {
   });
 
   ngOnInit(): void {
-    this.service.getAll().subscribe((pets) => {
-      this.pets.set(pets);
-      this.loaded.set(true);
-    });
+    this.load();
+
+    this.ownerService
+      .getAll()
+      .subscribe((owners) => this.ownersById.set(new Map(owners.map((o) => [o.id, o]))));
   }
 
   protected onSearch(event: Event): void {
@@ -412,6 +447,14 @@ export class PetList implements OnInit {
   protected clearSearch(): void {
     this.search.set('');
   }
+
+  // Texto de la tarjeta: correo y teléfono del dueño de la mascota.
+  protected ownerInfo(pet: Pet): string {
+    const owner = this.ownersById().get(pet.ownerId);
+    if (!owner) return '';
+    return `✉ ${owner.email}\n☎ ${owner.phone || 'Sin teléfono'}`;
+  }
+
   protected remove(pet: Pet): void {
     if (!confirm(`¿Eliminar a ${pet.name}?`)) return;
 

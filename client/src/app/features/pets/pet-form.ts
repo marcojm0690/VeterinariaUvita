@@ -1,14 +1,27 @@
-import { Component, inject, input, OnInit, signal } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, computed, effect, inject, input, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { FormControl, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
 
 import { Owner } from '../../core/models';
 import { OwnerService } from '../../core/services/owner.service';
 import { PetService } from '../../core/services/pet.service';
+
+// Quita tildes y mayúsculas para que al buscar "jose" también aparezca "José".
+function normalize(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
 
 // Este componente sirve para registrar y editar mascotas.
 @Component({
@@ -19,8 +32,10 @@ import { PetService } from '../../core/services/pet.service';
     ReactiveFormsModule,
     MatFormFieldModule,
     MatInputModule,
-    MatSelectModule,
+    MatAutocompleteModule,
     MatButtonModule,
+    MatIconModule,
+    MatTooltipModule,
     RouterLink
   ],
 
@@ -94,20 +109,55 @@ import { PetService } from '../../core/services/pet.service';
               <mat-error>El peso debe ser mayor que cero</mat-error>
             </mat-form-field>
 
-            <!-- Lista desplegable con los propietarios registrados -->
-            <mat-form-field appearance="outline">
-              <mat-label>Propietario</mat-label>
-              <mat-select formControlName="ownerId" panelClass="vet-select-panel">
-                @for (dueno of duenos(); track dueno.id) {
-                  <mat-option [value]="dueno.id">{{ dueno.firstName }} {{ dueno.lastName }}</mat-option>
-                }
-              </mat-select>
-              <mat-error>Seleccione un propietario</mat-error>
+            <!-- Propietario: lista desplegable + burbujas con sus datos de contacto -->
+            <div class="owner-field">
+              <mat-form-field appearance="outline">
+                <mat-label>Propietario</mat-label>
+                <input
+                  matInput
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Escribe para buscar"
+                  [formControl]="busqueda"
+                  [matAutocomplete]="auto" />
+                <mat-autocomplete
+                  #auto="matAutocomplete"
+                  class="vet-select-panel"
+                  [displayWith]="mostrarNombre"
+                  (optionSelected)="elegirPropietario($event.option.value)">
+                  @for (dueno of filtrados(); track dueno.id) {
+                    <!-- En computadora, al pasar el mouse también se ve el tooltip -->
+                    <mat-option
+                      [value]="dueno"
+                      [matTooltip]="'✉ ' + dueno.email + '\\n☎ ' + (dueno.phone || 'Sin teléfono')"
+                      matTooltipPosition="left"
+                      matTooltipClass="owner-tip"
+                      [matTooltipShowDelay]="150">
+                      {{ dueno.firstName }} {{ dueno.lastName }}
+                    </mat-option>
+                  }
+                </mat-autocomplete>
+                <mat-error>Elija un propietario de la lista</mat-error>
 
-              @if (duenosCargados() && duenos().length === 0) {
-                <mat-hint>No hay propietarios registrados todavía</mat-hint>
+                @if (duenosCargados() && duenos().length === 0) {
+                  <mat-hint>No hay propietarios registrados todavía</mat-hint>
+                }
+              </mat-form-field>
+
+              <!-- Estas burbujas aparecen cuando hay un propietario seleccionado -->
+              @if (propietario(); as p) {
+                <div class="owner-chips">
+                  <span class="owner-chip">
+                    <mat-icon aria-hidden="true">call</mat-icon>
+                    {{ p.phone || 'Sin teléfono' }}
+                  </span>
+                  <span class="owner-chip owner-chip-email" [attr.title]="p.email">
+                    <mat-icon aria-hidden="true">mail</mat-icon>
+                    <span class="owner-chip-text">{{ p.email || 'Sin correo' }}</span>
+                  </span>
+                </div>
               }
-            </mat-form-field>
+            </div>
           </div>
         </div>
 
@@ -161,6 +211,17 @@ import { PetService } from '../../core/services/pet.service';
       --mat-sys-secondary-container: #d3ebef;
       --mat-sys-on-secondary-container: #12384a;
       --mat-sys-corner-extra-small: 4px;
+    }
+
+    /* Tarjeta con correo y teléfono del propietario (tooltip de cada opción) */
+    ::ng-deep .owner-tip .mdc-tooltip__surface {
+      white-space: pre-line;
+      max-width: 320px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #ffffff;
+      background: #12384a;
     }
 
     .card {
@@ -275,10 +336,56 @@ import { PetService } from '../../core/services/pet.service';
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       column-gap: 20px;
+      align-items: start;
     }
 
     mat-form-field {
       width: 100%;
+    }
+
+    /* Burbujas con teléfono y correo del propietario seleccionado */
+    .owner-field {
+      min-width: 0;
+    }
+
+    .owner-chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-top: -6px;
+    }
+
+    .owner-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      max-width: 100%;
+      box-sizing: border-box;
+      padding: 2px 10px 2px 6px;
+      font-size: 0.75rem;
+      line-height: 1.3;
+      font-weight: 600;
+      white-space: nowrap;
+      color: var(--vet-sea-ink, #0b4f63);
+      background: #eedcbe;
+      border: 1px solid #dcc8a3;
+      border-radius: 999px;
+    }
+    .owner-chip mat-icon {
+      flex: none;
+      width: 14px;
+      height: 14px;
+      font-size: 14px;
+    }
+    .owner-chip-email {
+      min-width: 0;
+    }
+    .owner-chip-text {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .actions {
@@ -374,6 +481,70 @@ export class PetForm implements OnInit {
     // Aunque la persona elige un nombre, aquí se guarda el ID de ese propietario.
     ownerId: [0, [Validators.required, Validators.min(1)]]
   });
+
+  // El ID del propietario elegido, como señal, para que la pantalla se actualice al cambiarlo.
+  private readonly ownerIdSeleccionado = toSignal(this.form.controls.ownerId.valueChanges, {
+    initialValue: this.form.controls.ownerId.value
+  });
+
+  // El propietario completo (con correo y teléfono) que corresponde al ID elegido.
+  protected readonly propietario = computed(() =>
+    this.duenos().find(d => d.id === this.ownerIdSeleccionado()) ?? null
+  );
+
+  // Texto que la persona escribe para buscar al propietario.
+  // Cuando elige uno de la lista, aquí queda guardado el propietario completo.
+  protected readonly busqueda = new FormControl<string | Owner>('', {
+    nonNullable: true,
+    validators: [
+      Validators.required,
+      // Escribir no basta: hay que elegir a alguien de la lista.
+      (c) => (typeof c.value === 'object' && c.value !== null ? null : { noElegido: true })
+    ]
+  });
+
+  private readonly busquedaValor = toSignal(this.busqueda.valueChanges, {
+    initialValue: this.busqueda.value
+  });
+
+  // Propietarios que coinciden con lo escrito (por nombre, correo o teléfono).
+  protected readonly filtrados = computed(() => {
+    const valor = this.busquedaValor();
+    const terminos = normalize(typeof valor === 'string' ? valor : '').split(' ').filter(Boolean);
+    if (terminos.length === 0) return this.duenos();
+
+    return this.duenos().filter(d => {
+      const texto = normalize(`${d.firstName} ${d.lastName} ${d.email ?? ''} ${d.phone ?? ''}`);
+      return terminos.every(t => texto.includes(t));
+    });
+  });
+
+  // Cómo se muestra en el campo el propietario elegido.
+  protected readonly mostrarNombre = (o: string | Owner | null): string =>
+    !o ? '' : typeof o === 'string' ? o : `${o.firstName} ${o.lastName}`;
+
+  constructor() {
+    // Si la persona vuelve a escribir, se borra el propietario elegido hasta que elija otro.
+    this.busqueda.valueChanges.pipe(takeUntilDestroyed()).subscribe(valor => {
+      if (typeof valor === 'string') {
+        this.form.controls.ownerId.setValue(0);
+      }
+    });
+
+    // Al editar una mascota (o cuando llega la lista), el campo muestra el nombre de su dueño.
+    effect(() => {
+      const p = this.propietario();
+      if (p && this.busqueda.value !== p) {
+        this.busqueda.setValue(p, { emitEvent: false });
+      }
+    });
+  }
+
+  // Se ejecuta cuando la persona elige un propietario de la lista.
+  protected elegirPropietario(dueno: Owner): void {
+    this.form.controls.ownerId.setValue(dueno.id);
+    this.form.controls.ownerId.markAsDirty();
+  }
 
   // Este método se ejecuta cuando se abre la pantalla.
   ngOnInit(): void {

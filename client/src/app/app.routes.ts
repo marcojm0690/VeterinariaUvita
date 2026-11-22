@@ -21,6 +21,7 @@ export const routes: Routes = [
       { path: '', loadComponent: () => import('./features/pets/pet-list').then((m) => m.PetList) },
       { path: 'new', loadComponent: () => import('./features/pets/pet-form').then((m) => m.PetForm) },
       { path: ':id', loadComponent: () => import('./features/pets/pet-form').then((m) => m.PetForm) },
+      { path: ':id/details', loadComponent: () => import('./features/pets/pet-detail').then((m) => m.PetDetail) },
     ],
   },
   {

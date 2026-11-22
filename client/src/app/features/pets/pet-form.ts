@@ -1,17 +1,39 @@
 import { Component, computed, effect, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormControl, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators
+} from '@angular/forms';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
+import { Observable } from 'rxjs';
 
 import { Owner } from '../../core/models';
 import { OwnerService } from '../../core/services/owner.service';
 import { PetService } from '../../core/services/pet.service';
+
+// Límites que usa el sistema para validar. Se pueden cambiar aquí.
+const MAX_PESO_KG = 200;
+const MAX_EDAD_ANIOS = 40;
+const LARGO_MINIMO_NOMBRE = 2;
+const LARGO_MAXIMO_TEXTO = 50;
+
+// Letras (con tildes), números, espacios, guiones, puntos y apóstrofes.
+const PATRON_NOMBRE = /^[\p{L}\p{N}][\p{L}\p{N} .'’\-]*$/u;
+
+// Opciones de especie que se pueden elegir.
+const ESPECIES_BASE = ['Perro', 'Gato', 'Ave', 'Conejo', 'Roedor', 'Reptil', 'Pez', 'Caballo', 'Otro'];
 
 // Quita tildes y mayúsculas para que al buscar "jose" también aparezca "José".
 function normalize(value: string): string {
@@ -23,6 +45,66 @@ function normalize(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
+// Valida el nombre de la mascota: obligatorio, sin solo espacios, de 2 a 50 caracteres.
+function validarNombre(c: AbstractControl): ValidationErrors | null {
+  const valor = typeof c.value === 'string' ? c.value : '';
+  if (valor.length === 0) return { required: true };
+
+  const texto = valor.trim();
+  if (texto.length === 0) return { soloEspacios: true };
+  if (texto.length < LARGO_MINIMO_NOMBRE) return { largoMinimo: true };
+  if (texto.length > LARGO_MAXIMO_TEXTO) return { largoMaximo: true };
+  if (!PATRON_NOMBRE.test(texto)) return { caracteres: true };
+  return null;
+}
+
+// Valida la raza: es opcional, pero no puede ser solo espacios ni pasar de 50 caracteres.
+function validarRaza(c: AbstractControl): ValidationErrors | null {
+  const valor = typeof c.value === 'string' ? c.value : '';
+  if (valor.length === 0) return null;
+
+  const texto = valor.trim();
+  if (texto.length === 0) return { soloEspacios: true };
+  if (texto.length > LARGO_MAXIMO_TEXTO) return { largoMaximo: true };
+  return null;
+}
+
+// Valida la fecha de nacimiento: opcional, real, no futura y con sentido para una mascota.
+function validarFechaNacimiento(c: AbstractControl): ValidationErrors | null {
+  const valor = c.value as string;
+  if (!valor) return null;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return { fechaInvalida: true };
+
+  const [anio, mes, dia] = valor.split('-').map(Number);
+  const fecha = new Date(anio, mes - 1, dia);
+  if (fecha.getFullYear() !== anio || fecha.getMonth() !== mes - 1 || fecha.getDate() !== dia) {
+    return { fechaInvalida: true };
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  if (fecha > hoy) return { fechaFutura: true };
+
+  const limite = new Date(hoy);
+  limite.setFullYear(hoy.getFullYear() - MAX_EDAD_ANIOS);
+  if (fecha < limite) return { fechaMuyAntigua: true };
+
+  return null;
+}
+
+// Valida el peso: opcional, numérico, mayor que 0 y menor o igual al límite del sistema.
+function validarPeso(c: AbstractControl): ValidationErrors | null {
+  const valor = c.value;
+  if (valor === null || valor === undefined || valor === '') return null;
+
+  if (typeof valor !== 'number' || !Number.isFinite(valor)) return { pesoNoNumerico: true };
+  if (valor < 0) return { pesoNegativo: true };
+  if (valor === 0) return { pesoCero: true };
+  if (valor > MAX_PESO_KG) return { pesoExcesivo: true };
+  return null;
+}
+
 // Este componente sirve para registrar y editar mascotas.
 @Component({
   selector: 'app-pet-form',
@@ -32,6 +114,7 @@ function normalize(value: string): string {
     ReactiveFormsModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatAutocompleteModule,
     MatButtonModule,
     MatIconModule,
@@ -64,7 +147,7 @@ function normalize(value: string): string {
         </div>
       </header>
 
-      <form [formGroup]="form" (ngSubmit)="guardar()">
+      <form [formGroup]="form" (ngSubmit)="guardar()" novalidate>
 
         <div class="group">
           <div class="section-label">La mascota</div>
@@ -73,21 +156,40 @@ function normalize(value: string): string {
             <!-- Campo para escribir el nombre de la mascota -->
             <mat-form-field appearance="outline">
               <mat-label>Nombre de la mascota</mat-label>
-              <input matInput formControlName="name" />
-              <mat-error>El nombre es obligatorio</mat-error>
+              <input matInput formControlName="name" autocomplete="off" />
+              @if (form.controls.name.hasError('required')) {
+                <mat-error>El nombre de la mascota es obligatorio.</mat-error>
+              } @else if (form.controls.name.hasError('soloEspacios')) {
+                <mat-error>El nombre no puede contener solo espacios.</mat-error>
+              } @else if (form.controls.name.hasError('largoMinimo')) {
+                <mat-error>El nombre debe contener al menos 2 caracteres.</mat-error>
+              } @else if (form.controls.name.hasError('largoMaximo')) {
+                <mat-error>El nombre no puede superar los 50 caracteres.</mat-error>
+              } @else if (form.controls.name.hasError('caracteres')) {
+                <mat-error>Use solo letras, números, espacios y guiones.</mat-error>
+              }
             </mat-form-field>
 
-            <!-- Campo para escribir la especie -->
+            <!-- Lista para elegir la especie (no se puede escribir cualquier cosa) -->
             <mat-form-field appearance="outline">
               <mat-label>Especie</mat-label>
-              <input matInput formControlName="species" />
-              <mat-error>La especie es obligatoria</mat-error>
+              <mat-select formControlName="species" panelClass="vet-select-panel">
+                @for (especie of especies(); track especie) {
+                  <mat-option [value]="especie">{{ especie }}</mat-option>
+                }
+              </mat-select>
+              <mat-error>Debe seleccionar una especie.</mat-error>
             </mat-form-field>
 
             <!-- Campo para escribir la raza -->
             <mat-form-field appearance="outline">
               <mat-label>Raza</mat-label>
-              <input matInput formControlName="breed" />
+              <input matInput formControlName="breed" autocomplete="off" />
+              @if (form.controls.breed.hasError('soloEspacios')) {
+                <mat-error>La raza no puede contener solo espacios.</mat-error>
+              } @else if (form.controls.breed.hasError('largoMaximo')) {
+                <mat-error>La raza no puede superar los 50 caracteres.</mat-error>
+              }
             </mat-form-field>
           </div>
         </div>
@@ -99,14 +201,29 @@ function normalize(value: string): string {
             <!-- Campo para seleccionar la fecha de nacimiento -->
             <mat-form-field appearance="outline">
               <mat-label>Fecha de nacimiento</mat-label>
-              <input matInput type="date" formControlName="birthDate" />
+              <input matInput type="date" formControlName="birthDate" [max]="hoy" />
+              @if (form.controls.birthDate.hasError('fechaFutura')) {
+                <mat-error>La fecha de nacimiento no puede ser futura.</mat-error>
+              } @else if (form.controls.birthDate.hasError('fechaMuyAntigua')) {
+                <mat-error>La fecha no es realista para una mascota (máximo 40 años).</mat-error>
+              } @else if (form.controls.birthDate.hasError('fechaInvalida')) {
+                <mat-error>Ingrese una fecha de nacimiento válida.</mat-error>
+              }
             </mat-form-field>
 
             <!-- Campo para escribir el peso de la mascota -->
             <mat-form-field appearance="outline">
               <mat-label>Peso en kilogramos</mat-label>
-              <input matInput type="number" min="0.01" formControlName="weightKg" />
-              <mat-error>El peso debe ser mayor que cero</mat-error>
+              <input matInput type="number" step="any" formControlName="weightKg" />
+              @if (form.controls.weightKg.hasError('pesoNegativo')) {
+                <mat-error>El peso no puede ser negativo.</mat-error>
+              } @else if (form.controls.weightKg.hasError('pesoCero')) {
+                <mat-error>El peso debe ser mayor que 0 kg.</mat-error>
+              } @else if (form.controls.weightKg.hasError('pesoExcesivo')) {
+                <mat-error>El peso no puede superar los 200 kg.</mat-error>
+              } @else if (form.controls.weightKg.hasError('pesoNoNumerico')) {
+                <mat-error>Ingrese un peso numérico válido.</mat-error>
+              }
             </mat-form-field>
 
             <!-- Propietario: lista desplegable + burbujas con sus datos de contacto -->
@@ -137,7 +254,11 @@ function normalize(value: string): string {
                     </mat-option>
                   }
                 </mat-autocomplete>
-                <mat-error>Elija un propietario de la lista</mat-error>
+                @if (busqueda.hasError('required')) {
+                  <mat-error>Debe seleccionar un propietario.</mat-error>
+                } @else if (busqueda.hasError('noElegido')) {
+                  <mat-error>El propietario seleccionado no es válido.</mat-error>
+                }
 
                 @if (duenosCargados() && duenos().length === 0) {
                   <mat-hint>No hay propietarios registrados todavía</mat-hint>
@@ -161,10 +282,20 @@ function normalize(value: string): string {
           </div>
         </div>
 
+        <!-- Avisos generales del formulario -->
+        @if (intentoFallido()) {
+          <p class="form-alert" role="alert">Revise los campos marcados antes de guardar.</p>
+        }
+        @if (errorGuardado(); as mensaje) {
+          <p class="form-alert" role="alert">{{ mensaje }}</p>
+        }
+
         <!-- Botones para cancelar o guardar -->
         <div class="actions">
           <a mat-button routerLink="/pets">Cancelar</a>
-          <button mat-flat-button type="submit" [disabled]="form.invalid">Guardar</button>
+          <button mat-flat-button type="submit" [disabled]="obligatoriosInvalidos() || guardando()">
+            {{ guardando() ? 'Guardando...' : 'Guardar' }}
+          </button>
         </div>
 
       </form>
@@ -388,6 +519,18 @@ function normalize(value: string): string {
       white-space: nowrap;
     }
 
+    /* Aviso general cuando hay errores o falla el guardado */
+    .form-alert {
+      margin: 0;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #8a2f1b;
+      background: #f9e3dd;
+      border: 1px solid #e3b4a8;
+      border-radius: 6px;
+    }
+
     .actions {
       display: flex;
       gap: 10px;
@@ -455,9 +598,21 @@ export class PetForm implements OnInit {
   private servicio = inject(PetService);
   private servicioDuenos = inject(OwnerService);
   private router = inject(Router);
+  private snackBar = inject(MatSnackBar);
 
   // Este dato nos ayuda a saber si estamos editando una mascota.
   readonly id = input<string>();
+
+  // Fecha de hoy (yyyy-MM-dd) para que el calendario no deje elegir días futuros.
+  protected readonly hoy = (() => {
+    const d = new Date();
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const dia = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mes}-${dia}`;
+  })();
+
+  // Lista de especies que se pueden elegir.
+  protected readonly especies = signal<string[]>([...ESPECIES_BASE]);
 
   // Aquí guardamos la lista de propietarios que se muestra en el campo desplegable.
   protected readonly duenos = signal<Owner[]>([]);
@@ -465,21 +620,38 @@ export class PetForm implements OnInit {
   // Nos avisa cuando ya terminó de cargar la lista de propietarios.
   protected readonly duenosCargados = signal(false);
 
+  // Avisos generales del formulario.
+  protected readonly intentoFallido = signal(false);
+  protected readonly errorGuardado = signal<string | null>(null);
+  protected readonly guardando = signal(false);
+
   // Aquí creamos los campos del formulario.
-  // Validators.required significa que el campo es obligatorio.
+  // Cada campo tiene sus validaciones (ver las funciones de arriba).
   protected form = this.fb.group({
 
-    name: ['', [Validators.required, Validators.maxLength(100)]],
+    name: ['', validarNombre],
     species: ['', Validators.required],
-    breed: [''],
-    birthDate: [''],
+    breed: ['', validarRaza],
+    birthDate: ['', validarFechaNacimiento],
 
-    // El peso es opcional, pero si se escribe debe ser mayor que cero.
-    weightKg: [null as number | null, Validators.min(0.01)],
+    // El peso es opcional, pero si se escribe debe ser positivo y razonable.
+    weightKg: [null as number | null, validarPeso],
 
     // La mascota debe estar relacionada con un propietario.
     // Aunque la persona elige un nombre, aquí se guarda el ID de ese propietario.
     ownerId: [0, [Validators.required, Validators.min(1)]]
+  });
+
+  // Cambia cada vez que el formulario revisa sus validaciones (para actualizar la pantalla).
+  private readonly estadoForm = toSignal(this.form.statusChanges, {
+    initialValue: this.form.status
+  });
+
+  // El botón Guardar se deshabilita si los campos obligatorios no son válidos.
+  protected readonly obligatoriosInvalidos = computed(() => {
+    this.estadoForm();
+    const c = this.form.controls;
+    return c.name.invalid || c.species.invalid || c.ownerId.invalid;
   });
 
   // El ID del propietario elegido, como señal, para que la pantalla se actualice al cambiarlo.
@@ -531,6 +703,13 @@ export class PetForm implements OnInit {
       }
     });
 
+    // Cuando el formulario vuelve a estar correcto, se quita el aviso de errores.
+    this.form.statusChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      if (this.form.valid) {
+        this.intentoFallido.set(false);
+      }
+    });
+
     // Al editar una mascota (o cuando llega la lista), el campo muestra el nombre de su dueño.
     effect(() => {
       const p = this.propietario();
@@ -568,6 +747,11 @@ export class PetForm implements OnInit {
 
       this.servicio.getById(Number(idMascota)).subscribe(mascota => {
 
+        // Si la especie guardada no está en la lista, la agregamos para no perderla.
+        if (mascota.species && !this.especies().includes(mascota.species)) {
+          this.especies.update(lista => [...lista, mascota.species]);
+        }
+
         // Colocamos los datos encontrados en el formulario.
         this.form.patchValue({
           name: mascota.name,
@@ -585,19 +769,32 @@ export class PetForm implements OnInit {
   // Este método es para Guardar.
   protected guardar(): void {
 
-    // Si faltan datos obligatorios, no deja guardar.
-    if (this.form.invalid) {
+    // Evita guardar dos veces seguidas por un doble clic.
+    if (this.guardando()) {
       return;
     }
+
+    this.errorGuardado.set(null);
+
+    // Si hay errores (o el propietario no existe en el sistema), no deja guardar
+    // y marca todos los campos para que se vean sus mensajes.
+    if (this.form.invalid || !this.propietario()) {
+      this.form.markAllAsTouched();
+      this.busqueda.markAsTouched();
+      this.intentoFallido.set(true);
+      return;
+    }
+
+    this.intentoFallido.set(false);
 
     // Obtenemos los datos que escribió el usuario.
     const datos = this.form.getRawValue();
 
-    // Preparamos la información que enviaremos al servicio.
+    // Preparamos la información que enviaremos al servicio (sin espacios al inicio ni al final).
     const mascota = {
-      name: datos.name,
-      species: datos.species,
-      breed: datos.breed || null,
+      name: datos.name.trim(),
+      species: datos.species.trim(),
+      breed: datos.breed.trim() || null,
       birthDate: datos.birthDate || null,
       weightKg: datos.weightKg,
       ownerId: datos.ownerId
@@ -606,25 +803,54 @@ export class PetForm implements OnInit {
     // Revisamos si vamos a registrar o editar.
     const idMascota = this.id();
 
-    if (idMascota) {
+    // Antes de guardar, revisamos que no exista la misma mascota (mismo nombre, especie y propietario).
+    this.guardando.set(true);
 
-      // Si tiene ID, actualizamos la mascota.
-      this.servicio.update(Number(idMascota), mascota).subscribe(() => {
+    this.servicio.getAll().subscribe({
+      next: lista => {
+        const duplicada = lista.some(p =>
+          String(p.id) !== idMascota &&
+          p.ownerId === mascota.ownerId &&
+          normalize(p.name) === normalize(mascota.name) &&
+          normalize(p.species) === normalize(mascota.species)
+        );
+
+        if (duplicada) {
+          this.guardando.set(false);
+          this.errorGuardado.set('Ya existe una mascota con el mismo nombre y especie para este propietario.');
+          return;
+        }
+
+        this.enviar(mascota, idMascota);
+      },
+      error: () => {
+        this.guardando.set(false);
+        this.errorGuardado.set('No se pudo verificar si la mascota ya existe. Intente de nuevo; sus datos se conservaron.');
+      }
+    });
+  }
+
+  // Envía la mascota al servicio: la crea o la actualiza según el caso.
+  private enviar(mascota: any, idMascota: string | undefined): void {
+
+    const peticion = (idMascota
+      ? this.servicio.update(Number(idMascota), mascota)
+      : this.servicio.create(mascota)) as Observable<unknown>;
+
+    peticion.subscribe({
+      next: () => {
+        this.guardando.set(false);
+        this.snackBar.open('Mascota guardada correctamente', 'Cerrar', { duration: 3000 });
 
         // Regresamos a la lista de mascotas.
         this.router.navigate(['/pets']);
-
-      });
-
-    } else {
-
-      // Si no tiene ID, registramos una mascota nueva.
-      this.servicio.create(mascota).subscribe(() => {
-
-        // Regresamos a la lista de mascotas.
-        this.router.navigate(['/pets']);
-
-      });
-    }
+      },
+      error: () => {
+        // Si falla, mostramos el mensaje y dejamos los datos escritos tal como están.
+        this.guardando.set(false);
+        this.errorGuardado.set('No se pudo guardar la mascota. Intente de nuevo; sus datos se conservaron.');
+      }
+    });
   }
 }
+

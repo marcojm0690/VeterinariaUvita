@@ -6,7 +6,9 @@
       "Bash(git ls-tree *)",
       "Bash(gh api *)",
       "Bash(git fetch *)",
-      "Bash(/opt/homebrew/bin/gh api *)"
+      "Bash(/opt/homebrew/bin/gh api *)",
+      "Bash(brew --version)",
+      "Bash(grep -E '^\\(gh|az\\)$')"
     ]
   }
 }

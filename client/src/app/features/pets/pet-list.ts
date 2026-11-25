@@ -68,12 +68,17 @@ function normalize(value: string): string {
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef>Nombre</th>
           <td mat-cell *matCellDef="let p">
-            <span class="pet-name">
+            <!-- Al hacer clic en el nombre se abre el detalle de la mascota -->
+            <a
+              class="pet-name"
+              [routerLink]="['/pets', p.id, 'details']"
+              [attr.aria-label]="'Ver detalles de ' + p.name"
+            >
               <span class="avatar" aria-hidden="true">
                 <svg viewBox="0 0 64 64" fill="currentColor"><use href="#vet-paw" /></svg>
               </span>
               {{ p.name }}
-            </span>
+            </a>
           </td>
         </ng-container>
         <ng-container matColumnDef="species">
@@ -362,6 +367,13 @@ function normalize(value: string): string {
       gap: 12px;
       font-weight: 600;
       color: var(--vet-sea-ink);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .pet-name:hover {
+      color: var(--vet-sea-deep);
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
 
     .avatar {
